@@ -440,10 +440,10 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 			"heap->ops->map_dma should return ERR_PTR on error"))
 		table = ERR_PTR(-EINVAL);
 	if (IS_ERR(table)) {
-		heap->ops->free(buffer);
-		kfree(buffer);
-		return ERR_CAST(table);
+		ret = -EINVAL;
+		goto err1;
 	}
+
 	buffer->sg_table = table;
 	if (ion_buffer_fault_user_mappings(buffer)) {
 		int num_pages = PAGE_ALIGN(buffer->size) / PAGE_SIZE;
@@ -453,7 +453,7 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 		buffer->pages = vmalloc(sizeof(struct page *) * num_pages);
 		if (!buffer->pages) {
 			ret = -ENOMEM;
-			goto err1;
+			goto err;
 		}
 
 		for_each_sg(table->sgl, sg, table->nents, i) {
@@ -484,8 +484,9 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 	mutex_unlock(&dev->buffer_lock);
 	return buffer;
 
-err1:
+err:
 	heap->ops->unmap_dma(heap, buffer);
+err1:
 	heap->ops->free(buffer);
 err2:
 	kfree(buffer);
@@ -793,7 +794,7 @@ static int ion_handle_add(struct ion_client *client, struct ion_handle *handle)
 	return 0;
 }
 
-unsigned int ion_parse_heap_id(unsigned int heap_id_mask, unsigned int flags);
+int ion_parse_heap_id(unsigned int heap_id_mask, unsigned int flags);
 
 static struct ion_handle *__ion_alloc(struct ion_client *client, size_t len,
 			     size_t align, unsigned int heap_id_mask,
@@ -823,14 +824,9 @@ static struct ion_handle *__ion_alloc(struct ion_client *client, size_t len,
 		return ERR_PTR(-EINVAL);
 	}
 
-	heap_id_mask = ion_parse_heap_id(heap_id_mask, flags);
-	if (heap_id_mask == 0) {
-		trace_ion_alloc_fail(client->name, EINVAL, len,
-				align, heap_id_mask, flags);
-		return ERR_PTR(-EINVAL);
-	}
-
 	down_read(&dev->lock);
+	heap_id_mask = ion_parse_heap_id(heap_id_mask, flags);
+
 	plist_for_each_entry(heap, &dev->heaps, node) {
 		/* if the caller didn't specify this heap id */
 		if (!((1 << heap->id) & heap_id_mask))
@@ -1644,13 +1640,13 @@ struct ion_handle *ion_import_dma_buf(struct ion_client *client, int fd)
 		mutex_unlock(&client->lock);
 		goto end;
 	}
+	mutex_unlock(&client->lock);
 
 	handle = ion_handle_create(client, buffer);
-	if (IS_ERR(handle)) {
-		mutex_unlock(&client->lock);
+	if (IS_ERR(handle))
 		goto end;
-	}
 
+	mutex_lock(&client->lock);
 	ret = ion_handle_add(client, handle);
 	mutex_unlock(&client->lock);
 	if (ret) {
@@ -1663,18 +1659,6 @@ end:
 	return handle;
 }
 EXPORT_SYMBOL(ion_import_dma_buf);
-
-int ion_cached_needsync_dmabuf(struct dma_buf *dmabuf)
-{
-	struct ion_buffer *buffer = dmabuf->priv;
-	unsigned long cacheflag = ION_FLAG_CACHED | ION_FLAG_CACHED_NEEDS_SYNC;
-
-	if (dmabuf->ops != &dma_buf_ops)
-		return -EINVAL;
-
-	return ((buffer->flags & cacheflag) == cacheflag) ? 1 : 0;
-}
-EXPORT_SYMBOL(ion_cached_needsync_dmabuf);
 
 static int ion_sync_for_device(struct ion_client *client, int fd)
 {
@@ -1709,18 +1693,8 @@ static int ion_sync_for_device(struct ion_client *client, int fd)
 				buffer->sg_table->nents, DMA_BIDIRECTIONAL,
 				ion_buffer_flush, false);
 	} else {
-		struct scatterlist *sg, *sgl;
-		int nelems;
-		void *vaddr;
-		int i = 0;
-
-		sgl = buffer->sg_table->sgl;
-		nelems = buffer->sg_table->nents;
-
-		for_each_sg(sgl, sg, nelems, i) {
-			vaddr = phys_to_virt(sg_phys(sg));
-			__dma_flush_range(vaddr, vaddr + sg->length);
-		}
+		dma_sync_sg_for_device(NULL, buffer->sg_table->sgl,
+					buffer->sg_table->nents, DMA_BIDIRECTIONAL);
 	}
 
 	trace_ion_sync_end(_RET_IP_, buffer->dev->dev.this_device,
@@ -2024,7 +1998,7 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		}
 	}
 	if (cleanup_handle)
-		ion_handle_put(client,cleanup_handle);
+		ion_handle_put(client, cleanup_handle);
 	return ret;
 }
 
