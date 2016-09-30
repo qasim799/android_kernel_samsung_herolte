@@ -32,12 +32,26 @@ config ANDROID_BINDER_IPC_32BIT
 
 	  Note that enabling this will break newer Android user-space.
 
+<<<<<<< HEAD
 config SEC_TRACE_BINDERCNT
 	bool "Trace process binder count"
 	default n
 	---help---
 	  This feature can be used to monitor binder transactions count to
 	  a designated process.
+=======
+config ANDROID_BINDER_DEVICES
+	string "Android Binder devices"
+	depends on ANDROID_BINDER_IPC
+	default "binder"
+	---help---
+	  Default value for the binder.devices parameter.
+
+	  The binder.devices parameter is a comma-separated list of strings
+	  that specifies the names of the binder device nodes that will be
+	  created. Each binder device has its own context manager, and is
+	  therefore logically separated from the other devices.
+>>>>>>> 4aa08864217... android: binder: support multiple /dev instances.
 
 config ASHMEM
 	bool "Enable the Anonymous Shared Memory Subsystem"
