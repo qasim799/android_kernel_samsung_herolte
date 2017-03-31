@@ -42,7 +42,7 @@ config SEC_TRACE_BINDERCNT
 config ANDROID_BINDER_DEVICES
 	string "Android Binder devices"
 	depends on ANDROID_BINDER_IPC
-	default "binder"
+	default "binder,hwbinder,vndbinder"
 	---help---
 	  Default value for the binder.devices parameter.
 
