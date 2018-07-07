@@ -182,7 +182,7 @@ extern struct security_operations *security_ops;
 static atomic_t selinux_secmark_refcount = ATOMIC_INIT(0);
 
 #ifdef CONFIG_SECURITY_SELINUX_DEVELOP
-RKP_RO_AREA int selinux_enforcing;
+RKP_RO_AREA int selinux_enforcing = 0;
 
 static int __init enforcing_setup(char *str)
 {
@@ -195,6 +195,7 @@ static int __init enforcing_setup(char *str)
 		selinux_enforcing = enforcing ? 1 : 0;
 #endif
 // ] SEC_SELINUX_PORTING_COMMON
+        selinux_enforcing = 0;
 	return 1;
 }
 __setup("enforcing=", enforcing_setup);
@@ -510,16 +511,36 @@ static int selinux_is_sblabel_mnt(struct super_block *sb)
 {
 	struct superblock_security_struct *sbsec = sb->s_security;
 
-	return sbsec->behavior == SECURITY_FS_USE_XATTR ||
-		sbsec->behavior == SECURITY_FS_USE_TRANS ||
-		sbsec->behavior == SECURITY_FS_USE_TASK ||
-		sbsec->behavior == SECURITY_FS_USE_NATIVE ||
-		/* Special handling. Genfs but also in-core setxattr handler */
-		!strcmp(sb->s_type->name, "sysfs") ||
-		!strcmp(sb->s_type->name, "pstore") ||
-		!strcmp(sb->s_type->name, "debugfs") ||
-		!strcmp(sb->s_type->name, "tracefs") ||
-		!strcmp(sb->s_type->name, "rootfs");
+	if (sbsec->behavior == SECURITY_FS_USE_XATTR ||
+	    sbsec->behavior == SECURITY_FS_USE_TRANS ||
+	    sbsec->behavior == SECURITY_FS_USE_TASK ||
+	    sbsec->behavior == SECURITY_FS_USE_NATIVE)
+		return 1;
+
+	if (strncmp(sb->s_type->name, "pstore", sizeof("pstore")) == 0)
+		return 1;
+
+	if (strncmp(sb->s_type->name, "debugfs", sizeof("debugfs")) == 0)
+		return 1;
+
+	if (strncmp(sb->s_type->name, "f2fs", sizeof("f2fs")) == 0)
+		return 1;
+
+	if (strncmp(sb->s_type->name, "sdcardfs", sizeof("sdcardfs")) == 0)
+		return 1;
+
+	/* Special handling for sysfs. Is genfs but also has setxattr handler*/
+	if (strncmp(sb->s_type->name, "sysfs", sizeof("sysfs")) == 0)
+		return 1;
+
+	/*
+	 * Special handling for rootfs. Is genfs but supports
+	 * setting SELinux context on in-core inodes.
+	 */
+	if (strncmp(sb->s_type->name, "rootfs", sizeof("rootfs")) == 0)
+		return 1;
+
+	return 0;
 }
 
 static int sb_finish_set_opts(struct super_block *sb)
