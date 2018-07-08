@@ -1,150 +1,115 @@
-menu "Android"
-
-config ANDROID
-	bool "Android Drivers"
-	---help---
-	  Enable support for various drivers needed on the Android platform
-
-if ANDROID
-
-config ANDROID_BINDER_IPC
-	bool "Android Binder IPC Driver"
-	depends on MMU
+menuconfig STAGING
+	bool "Staging drivers"
 	default n
 	---help---
-	  Binder is used in Android for both communication between processes,
-	  and remote method invocation.
+	  This option allows you to select a number of drivers that are
+	  not of the "normal" Linux kernel quality level.  These drivers
+	  are placed here in order to get a wider audience to make use of
+	  them.  Please note that these drivers are under heavy
+	  development, may or may not work, and may contain userspace
+	  interfaces that most likely will be changed in the near
+	  future.
 
-	  This means one Android process can call a method/routine in another
-	  Android process, using Binder to identify, invoke and pass arguments
-	  between said processes.
+	  Using any of these drivers will taint your kernel which might
+	  affect support options from both the community, and various
+	  commercial support organizations.
 
-config ANDROID_BINDER_IPC_32BIT
-	bool
-	depends on !64BIT && ANDROID_BINDER_IPC
-	default y
-	---help---
-	  The Binder API has been changed to support both 32 and 64bit
-	  applications in a mixed environment.
+	  If you wish to work on these drivers, to help improve them, or
+	  to report problems you have with them, please see the
+	  driver_name.README file in the drivers/staging/ directory to
+	  see what needs to be worked on, and who to contact.
 
-	  Enable this to support an old 32-bit Android user-space (v4.4 and
-	  earlier).
+	  If in doubt, say N here.
 
-	  Note that enabling this will break newer Android user-space.
 
-config SEC_TRACE_BINDERCNT
-	bool "Trace process binder count"
-	default n
-	---help---
-	  This feature can be used to monitor binder transactions count to
-	  a designated process.
+if STAGING
 
-config ANDROID_BINDER_DEVICES
-	string "Android Binder devices"
-	depends on ANDROID_BINDER_IPC
-	default "binder"
-	---help---
-	  Default value for the binder.devices parameter.
+source "drivers/staging/slicoss/Kconfig"
 
-	  The binder.devices parameter is a comma-separated list of strings
-	  that specifies the names of the binder device nodes that will be
-	  created. Each binder device has its own context manager, and is
-	  therefore logically separated from the other devices.
+source "drivers/staging/wlan-ng/Kconfig"
 
-config ASHMEM
-	bool "Enable the Anonymous Shared Memory Subsystem"
-	default n
-	depends on SHMEM
-	---help---
-	  The ashmem subsystem is a new shared memory allocator, similar to
-	  POSIX SHM but with different behavior and sporting a simpler
-	  file-based API.
+source "drivers/staging/comedi/Kconfig"
 
-	  It is, in theory, a good memory allocator for low-memory devices,
-	  because it can discard shared memory units when under memory pressure.
+source "drivers/staging/olpc_dcon/Kconfig"
 
-config ANDROID_LOGGER
-	tristate "Android log driver"
-	default n
-	depends on !EXYNOS_SNAPSHOT_PSTORE
-	---help---
-	  This adds support for system-wide logging using four log buffers.
+source "drivers/staging/panel/Kconfig"
 
-	  These are:
+source "drivers/staging/rtl8192u/Kconfig"
 
-	      1: main
-	      2: events
-	      3: radio
-	      4: system
+source "drivers/staging/rtl8192e/Kconfig"
 
-	  Log reading and writing is performed via normal Linux reads and
-	  optimized writes. This optimization avoids logging having too
-	  much overhead in the system.
+source "drivers/staging/rtl8712/Kconfig"
 
-config ANDROID_TIMED_OUTPUT
-	bool "Timed output class driver"
-	default y
+source "drivers/staging/rtl8188eu/Kconfig"
 
-config ANDROID_TIMED_GPIO
-	tristate "Android timed gpio driver"
-	depends on GPIOLIB && ANDROID_TIMED_OUTPUT
-	default n
+source "drivers/staging/rtl8723au/Kconfig"
 
-config ANDROID_LOW_MEMORY_KILLER
-	bool "Android Low Memory Killer"
-	---help---
-	  Registers processes to be killed when memory is low
+source "drivers/staging/rts5208/Kconfig"
 
-config ANDROID_LOW_MEMORY_KILLER_AUTODETECT_OOM_ADJ_VALUES
-	bool "Android Low Memory Killer: detect oom_adj values"
-	depends on ANDROID_LOW_MEMORY_KILLER
-	default y
-	---help---
-	  Detect oom_adj values written to
-	  /sys/module/lowmemorykiller/parameters/adj and convert them
-	  to oom_score_adj values.
+source "drivers/staging/line6/Kconfig"
 
-config ANDROID_INTF_ALARM_DEV
-	bool "Android alarm driver"
-	depends on RTC_CLASS
-	default n
-	---help---
-	  Provides non-wakeup and rtc backed wakeup alarms based on rtc or
-	  elapsed realtime, and a non-wakeup alarm on the monotonic clock.
-	  Also exports the alarm interface to user-space.
+source "drivers/staging/octeon/Kconfig"
 
-config SYNC
-	bool "Synchronization framework"
-	default n
-	select ANON_INODES
-	select DMA_SHARED_BUFFER
-	---help---
-	  This option enables the framework for synchronization between multiple
-	  drivers.  Sync implementations can take advantage of hardware
-	  synchronization built into devices like GPUs.
+source "drivers/staging/octeon-usb/Kconfig"
 
-config SW_SYNC
-	bool "Software synchronization objects"
-	default n
-	depends on SYNC
-	---help---
-	  A sync object driver that uses a 32bit counter to coordinate
-	  syncrhronization.  Useful when there is no hardware primitive backing
-	  the synchronization.
+source "drivers/staging/vt6655/Kconfig"
 
-config SW_SYNC_USER
-	bool "Userspace API for SW_SYNC"
-	default n
-	depends on SW_SYNC
-	---help---
-	  Provides a user space API to the sw sync object.
-	  *WARNING* improper use of this can result in deadlocking kernel
-	  drivers from userspace.
+source "drivers/staging/vt6656/Kconfig"
 
-source "drivers/staging/android/ion/Kconfig"
+source "drivers/staging/iio/Kconfig"
 
-source "drivers/staging/android/fiq_debugger/Kconfig"
+source "drivers/staging/xgifb/Kconfig"
 
-endif # if ANDROID
+source "drivers/staging/emxx_udc/Kconfig"
 
-endmenu
+source "drivers/staging/bcm/Kconfig"
+
+source "drivers/staging/ft1000/Kconfig"
+
+source "drivers/staging/speakup/Kconfig"
+
+source "drivers/staging/cptm1217/Kconfig"
+
+source "drivers/staging/ste_rmi4/Kconfig"
+
+source "drivers/staging/nvec/Kconfig"
+
+source "drivers/staging/media/Kconfig"
+
+source "drivers/staging/android/Kconfig"
+
+source "drivers/staging/board/Kconfig"
+
+source "drivers/staging/ozwpan/Kconfig"
+
+source "drivers/staging/gdm72xx/Kconfig"
+
+source "drivers/staging/gdm724x/Kconfig"
+
+source "drivers/staging/imx-drm/Kconfig"
+
+source "drivers/staging/fwserial/Kconfig"
+
+source "drivers/staging/goldfish/Kconfig"
+
+source "drivers/staging/netlogic/Kconfig"
+
+source "drivers/staging/mt29f_spinand/Kconfig"
+
+source "drivers/staging/lustre/Kconfig"
+
+source "drivers/staging/dgnc/Kconfig"
+
+source "drivers/staging/dgap/Kconfig"
+
+source "drivers/staging/gs_fpgaboot/Kconfig"
+
+source "drivers/staging/skein/Kconfig"
+
+source "drivers/staging/unisys/Kconfig"
+
+source "drivers/staging/samsung/Kconfig"
+
+source "drivers/staging/vnswap/Kconfig"
+
+endif # STAGING
