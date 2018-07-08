@@ -486,6 +486,7 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 
 err:
 	heap->ops->unmap_dma(heap, buffer);
+
 err1:
 	heap->ops->free(buffer);
 err2:
@@ -794,7 +795,7 @@ static int ion_handle_add(struct ion_client *client, struct ion_handle *handle)
 	return 0;
 }
 
-int ion_parse_heap_id(unsigned int heap_id_mask, unsigned int flags);
+unsigned int ion_parse_heap_id(unsigned int heap_id_mask, unsigned int flags);
 
 static struct ion_handle *__ion_alloc(struct ion_client *client, size_t len,
 			     size_t align, unsigned int heap_id_mask,
@@ -824,9 +825,14 @@ static struct ion_handle *__ion_alloc(struct ion_client *client, size_t len,
 		return ERR_PTR(-EINVAL);
 	}
 
-	down_read(&dev->lock);
 	heap_id_mask = ion_parse_heap_id(heap_id_mask, flags);
+	if (heap_id_mask == 0) {
+		trace_ion_alloc_fail(client->name, EINVAL, len,
+				align, heap_id_mask, flags);
+		return ERR_PTR(-EINVAL);
+	}
 
+	down_read(&dev->lock);
 	plist_for_each_entry(heap, &dev->heaps, node) {
 		/* if the caller didn't specify this heap id */
 		if (!((1 << heap->id) & heap_id_mask))
@@ -1640,13 +1646,13 @@ struct ion_handle *ion_import_dma_buf(struct ion_client *client, int fd)
 		mutex_unlock(&client->lock);
 		goto end;
 	}
-	mutex_unlock(&client->lock);
 
 	handle = ion_handle_create(client, buffer);
-	if (IS_ERR(handle))
+	if (IS_ERR(handle)) {
+		mutex_unlock(&client->lock);
 		goto end;
+	}
 
-	mutex_lock(&client->lock);
 	ret = ion_handle_add(client, handle);
 	mutex_unlock(&client->lock);
 	if (ret) {
@@ -1659,6 +1665,18 @@ end:
 	return handle;
 }
 EXPORT_SYMBOL(ion_import_dma_buf);
+
+int ion_cached_needsync_dmabuf(struct dma_buf *dmabuf)
+{
+	struct ion_buffer *buffer = dmabuf->priv;
+	unsigned long cacheflag = ION_FLAG_CACHED | ION_FLAG_CACHED_NEEDS_SYNC;
+
+	if (dmabuf->ops != &dma_buf_ops)
+		return -EINVAL;
+
+	return ((buffer->flags & cacheflag) == cacheflag) ? 1 : 0;
+}
+EXPORT_SYMBOL(ion_cached_needsync_dmabuf);
 
 static int ion_sync_for_device(struct ion_client *client, int fd)
 {
@@ -1693,8 +1711,18 @@ static int ion_sync_for_device(struct ion_client *client, int fd)
 				buffer->sg_table->nents, DMA_BIDIRECTIONAL,
 				ion_buffer_flush, false);
 	} else {
-		dma_sync_sg_for_device(NULL, buffer->sg_table->sgl,
-					buffer->sg_table->nents, DMA_BIDIRECTIONAL);
+		struct scatterlist *sg, *sgl;
+		int nelems;
+		void *vaddr;
+		int i = 0;
+
+		sgl = buffer->sg_table->sgl;
+		nelems = buffer->sg_table->nents;
+
+		for_each_sg(sgl, sg, nelems, i) {
+			vaddr = phys_to_virt(sg_phys(sg));
+			__dma_flush_range(vaddr, vaddr + sg->length);
+		}
 	}
 
 	trace_ion_sync_end(_RET_IP_, buffer->dev->dev.this_device,
@@ -1998,7 +2026,7 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		}
 	}
 	if (cleanup_handle)
-		ion_handle_put(client, cleanup_handle);
+		ion_handle_put(client,cleanup_handle);
 	return ret;
 }
 
