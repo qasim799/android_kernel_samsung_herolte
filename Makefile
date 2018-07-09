@@ -495,6 +495,8 @@ export ANDROID_MAJOR_VERSION=n
 
 PHONY += replace_dirs
 replace_dirs:
+# Example
+	@echo "I'm a seal"
 
 # To make sure we do not include .config for any of the *config targets
 # catch them early, and hand them over to scripts/kconfig/Makefile
